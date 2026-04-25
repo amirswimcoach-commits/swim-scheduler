@@ -186,6 +186,7 @@
   .session-block.pool { background: rgba(30,64,175,0.6); border-color: #3b82f6; color: #bfdbfe; }
   .session-block.home { background: rgba(109,40,217,0.6); border-color: #8b5cf6; color: #ddd6fe; }
   .session-block.confirmed { border-color: var(--success); }
+  .session-block.sent { border-style: dashed; opacity: 0.85; }
   .session-block.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.5); opacity: 0.85; z-index: 50; }
   .session-name { font-weight: 700; font-size: 12px; }
   .session-time { font-size: 10px; opacity: 0.8; }
@@ -238,7 +239,21 @@
   .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .hidden { display: none !important; }
+  /* drag highlight overlay */
+  .cal-day-col.drag-available { background: rgba(59,130,246,0.08); }
+  .cal-day-col.drag-unavailable { opacity: 0.25; pointer-events: none; }
+  .cal-day-col.drag-over { background: rgba(59,130,246,0.18); outline: 1px dashed var(--accent); }
+
+  /* add slot modal fields */
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .modal-field input, .modal-field select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size: 14px;
+    padding: 8px 12px; outline: none; font-family: inherit;
+  }
+  .modal-field input:focus, .modal-field select:focus { border-color: var(--accent); }
+  .modal-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .text-muted { color: var(--muted); }
   .text-sm { font-size: 13px; }
   .mt-12 { margin-top: 12px; }
@@ -325,6 +340,16 @@
         </div>
       </div>
 
+      <!-- Session Duration -->
+      <div class="card">
+        <div class="card-title">Session Duration</div>
+        <div class="session-count" id="durationCount">
+          <button class="session-btn" data-val="30" onclick="selectDuration(this)">30<span style="font-size:10px;display:block;font-weight:400">min</span></button>
+          <button class="session-btn selected" data-val="60" onclick="selectDuration(this)">60<span style="font-size:10px;display:block;font-weight:400">min</span></button>
+          <button class="session-btn" data-val="90" onclick="selectDuration(this)">90<span style="font-size:10px;display:block;font-weight:400">min</span></button>
+        </div>
+      </div>
+
       <!-- Availability -->
       <div class="card">
         <div class="card-title">Which days and windows are you available?</div>
@@ -384,6 +409,7 @@
       <h2>Weekly Schedule</h2>
       <div class="dash-actions">
         <button class="btn" onclick="loadSubmissions()">↻ Refresh</button>
+        <button class="btn" onclick="openAddSlotModal()">＋ Add Slot</button>
         <button class="btn btn-blue" id="aiBtn" onclick="runAI()">
           ✦ Propose with AI
         </button>
@@ -396,7 +422,7 @@
     <!-- Supabase config warning -->
     <div class="config-note hidden" id="configNote">
       <strong>⚠ Supabase not configured</strong>
-      Open this file and replace <code>https://itnuvlbvsavjoyvitebd.supabase.co</code> and <code>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bnV2bGJ2c2F2am95dml0ZWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTMwMjUsImV4cCI6MjA5MjYyOTAyNX0.t4SvFx3P4U6AOBFqU_g3P_BQa_bdHD5netxh-LxaIFo</code> with your project credentials. Running in demo mode with sample data.
+      Open this file and replace <code>YOUR_SUPABASE_URL</code> and <code>YOUR_SUPABASE_ANON_KEY</code> with your project credentials. Running in demo mode with sample data.
     </div>
 
     <!-- Stats -->
@@ -405,24 +431,6 @@
       <div class="stat-card"><div class="stat-label">Sessions Proposed</div><div class="stat-val" id="stat-sessions">–</div></div>
       <div class="stat-card"><div class="stat-label">Working Days</div><div class="stat-val amber" id="stat-days">–</div></div>
       <div class="stat-card"><div class="stat-label">Days Off</div><div class="stat-val green" id="stat-off">–</div></div>
-    </div>
-
-    <!-- Working hours config -->
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-title">Amir's Settings</div>
-      <div class="wh-row">
-        <label>Work hours</label>
-        <input type="time" id="cfg-start" value="09:00" />
-        <span class="text-muted text-sm">to</span>
-        <input type="time" id="cfg-end" value="20:00" />
-        <span style="margin-left:16px"></span>
-        <label>Session</label>
-        <input type="number" id="cfg-dur" value="60" min="30" max="120" step="15" />
-        <span class="text-muted text-sm">min</span>
-        <label style="margin-left:16px">Travel buffer</label>
-        <input type="number" id="cfg-buf" value="30" min="10" max="60" step="5" />
-        <span class="text-muted text-sm">min</span>
-      </div>
     </div>
 
     <div class="dash-grid">
@@ -462,6 +470,10 @@
             <h4>Per-Student Proposals</h4>
             <div class="proposal-list" id="proposalList"></div>
           </div>
+          <div class="proposals-wrap hidden" id="pendingSection" style="border-top:1px solid var(--border)">
+            <h4 style="color:var(--warning)">⚠ Awaiting Review</h4>
+            <div class="proposal-list" id="pendingList"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -471,12 +483,62 @@
 <!-- ══════════════ SEND MODAL ══════════════ -->
 <div class="modal-overlay" id="sendModal">
   <div class="modal">
-    <h3 id="modalTitle">Send Proposal</h3>
+    <h3 id="modalTitle">Send SMS Proposal</h3>
     <p id="modalDesc"></p>
     <div class="email-preview" id="emailPreview"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+      Student replies <strong style="color:var(--success)">YES</strong> to confirm · replies with a time to request a change (flagged for your review)
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-blue" onclick="confirmSend()" id="confirmSendBtn">Send Email</button>
+      <button class="btn btn-blue" onclick="confirmSend()" id="confirmSendBtn">📱 Send SMS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ADD SLOT MODAL ══════════════ -->
+<div class="modal-overlay" id="addSlotModal">
+  <div class="modal">
+    <h3>Add Session Slot</h3>
+    <p>Manually add a session to the calendar.</p>
+    <div class="modal-field">
+      <label>Student</label>
+      <input type="text" id="slot-student" placeholder="Type name or select below" list="studentList" />
+      <datalist id="studentList"></datalist>
+    </div>
+    <div class="modal-row-2">
+      <div class="modal-field">
+        <label>Day</label>
+        <select id="slot-day">
+          <option>Mon</option><option>Tue</option><option>Wed</option>
+          <option>Thu</option><option>Fri</option><option>Sat</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Location</label>
+        <select id="slot-loc">
+          <option value="pool">🏊 Pool</option>
+          <option value="home">🏠 Home Visit</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-row-2">
+      <div class="modal-field">
+        <label>Start Time</label>
+        <input type="time" id="slot-start" value="09:00" />
+      </div>
+      <div class="modal-field">
+        <label>Duration</label>
+        <select id="slot-dur">
+          <option value="30">30 min</option>
+          <option value="60" selected>60 min</option>
+          <option value="90">90 min</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeAddSlotModal()">Cancel</button>
+      <button class="btn btn-blue" onclick="confirmAddSlot()">Add to Calendar</button>
     </div>
   </div>
 </div>
@@ -486,8 +548,8 @@
 
 <script>
 // ══════════════ CONFIG — edit these ══════════════
-const SUPABASE_URL = 'https://itnuvlbvsavjoyvitebd.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_secret_k6oKQt-TT_Nzo3WEYeqWkg_bRsK8hx8';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 const DASHBOARD_PASSWORD = 'amir2024';
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -505,7 +567,7 @@ let selectedSubmission = null;
 let calendarSessions = [];
 
 function initSupabase() {
-  if (SUPABASE_URL !== 'https://itnuvlbvsavjoyvitebd.supabase.co' && window.supabase) {
+  if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase) {
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 }
@@ -550,9 +612,16 @@ function doLogin() {
 
 // ══════════════ FORM LOGIC ══════════════
 let selectedDays = new Set();
-let selectedWindows = {}; // { 'Tue': Set(['morning','afternoon']) }
+let selectedWindows = {};
 let selectedSessions = 3;
 let selectedLoc = 'pool';
+let selectedDuration = 60;
+
+function selectDuration(btn) {
+  document.querySelectorAll('#durationCount .session-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedDuration = parseInt(btn.dataset.val);
+}
 
 function selectSession(btn) {
   document.querySelectorAll('.session-btn').forEach(b => b.classList.remove('selected'));
@@ -629,6 +698,7 @@ async function submitForm() {
   const payload = {
     name, phone, email, address, notes,
     sessions_per_week: selectedSessions,
+    session_duration: selectedDuration,
     location: selectedLoc,
     availability,
     submitted_at: new Date().toISOString()
@@ -666,11 +736,11 @@ async function loadSubmissions() {
 }
 
 const DEMO_SUBMISSIONS = [
-  { id: 1, name: 'Priya Patel', phone: '0412 345 678', email: 'priya@email.com', address: '12 Beach Rd, St Kilda', sessions_per_week: 2, location: 'pool', availability: { Tue: ['morning','afternoon'], Fri: ['morning','afternoon'], Wed: ['morning'] }, notes: 'After 2:30pm preferred on Tuesdays', submitted_at: new Date().toISOString() },
-  { id: 2, name: 'Tom Hughes', phone: '0423 456 789', email: 'tom@email.com', address: '45 Lygon St, Carlton', sessions_per_week: 3, location: 'pool', availability: { Mon: ['afternoon','evening'], Thu: ['morning'], Sat: ['morning','afternoon'] }, notes: 'Prefer mornings on Saturday', submitted_at: new Date().toISOString() },
-  { id: 3, name: 'Emma Clark', phone: '0434 567 890', email: 'emma@email.com', address: '8 Domain Rd, South Yarra', sessions_per_week: 1, location: 'home', availability: { Wed: ['morning','afternoon'], Sat: ['morning'] }, notes: 'Home visit only please', submitted_at: new Date().toISOString() },
-  { id: 4, name: 'Liam Barrett', phone: '0445 678 901', email: 'liam@email.com', address: '22 Grattan St, Fitzroy', sessions_per_week: 2, location: 'pool', availability: { Tue: ['afternoon','evening'], Wed: ['afternoon'], Fri: ['afternoon','evening'] }, notes: '', submitted_at: new Date().toISOString() },
-  { id: 5, name: 'Sarah Wong', phone: '0456 789 012', email: 'sarah@email.com', address: '3 Queens Rd, Melbourne', sessions_per_week: 2, location: 'pool', availability: { Mon: ['morning'], Thu: ['morning','afternoon'], Fri: ['morning','afternoon'] }, notes: 'Must finish by 6pm', submitted_at: new Date().toISOString() },
+  { id: 1, name: 'Priya Patel', phone: '0412 345 678', email: 'priya@email.com', address: '12 Beach Rd, St Kilda', sessions_per_week: 2, session_duration: 60, location: 'pool', availability: { Tue: ['morning','afternoon'], Fri: ['morning','afternoon'], Wed: ['morning'] }, notes: 'After 2:30pm preferred on Tuesdays', submitted_at: new Date().toISOString() },
+  { id: 2, name: 'Tom Hughes', phone: '0423 456 789', email: 'tom@email.com', address: '45 Lygon St, Carlton', sessions_per_week: 3, session_duration: 90, location: 'pool', availability: { Mon: ['afternoon','evening'], Thu: ['morning'], Sat: ['morning','afternoon'] }, notes: 'Prefer mornings on Saturday', submitted_at: new Date().toISOString() },
+  { id: 3, name: 'Emma Clark', phone: '0434 567 890', email: 'emma@email.com', address: '8 Domain Rd, South Yarra', sessions_per_week: 1, session_duration: 60, location: 'home', availability: { Wed: ['morning','afternoon'], Sat: ['morning'] }, notes: 'Home visit only please', submitted_at: new Date().toISOString() },
+  { id: 4, name: 'Liam Barrett', phone: '0445 678 901', email: 'liam@email.com', address: '22 Grattan St, Fitzroy', sessions_per_week: 2, session_duration: 30, location: 'pool', availability: { Tue: ['afternoon','evening'], Wed: ['afternoon'], Fri: ['afternoon','evening'] }, notes: '', submitted_at: new Date().toISOString() },
+  { id: 5, name: 'Sarah Wong', phone: '0456 789 012', email: 'sarah@email.com', address: '3 Queens Rd, Melbourne', sessions_per_week: 2, session_duration: 60, location: 'pool', availability: { Mon: ['morning'], Thu: ['morning','afternoon'], Fri: ['morning','afternoon'] }, notes: 'Must finish by 6pm', submitted_at: new Date().toISOString() },
 ];
 
 function renderSubmissions() {
@@ -713,6 +783,7 @@ function selectSubmission(id) {
     <div class="detail-row"><span class="label">Email</span><span>${s.email}</span></div>
     <div class="detail-row"><span class="label">Address</span><span>${s.address || '–'}</span></div>
     <div class="detail-row"><span class="label">Sessions/week</span><span>${s.sessions_per_week}</span></div>
+    <div class="detail-row"><span class="label">Duration</span><span>${s.session_duration || 60} min</span></div>
     <div class="detail-row"><span class="label">Location</span><span>${s.location === 'pool' ? '🏊 Pool' : '🏠 Home'}</span></div>
     ${s.notes ? `<div class="detail-row"><span class="label">Notes</span><span style="max-width:180px;text-align:right">${s.notes}</span></div>` : ''}
     <div style="margin-top:12px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Availability</div>
@@ -747,7 +818,7 @@ function buildCalendarGrid() {
   // sessions layer
   bodyHtml += `<div class="cal-sessions-layer" id="sessionsLayer">`;
   DAYS.forEach((d, i) => {
-    bodyHtml += `<div class="cal-day-col" id="col-${d}" ondragover="event.preventDefault()" ondrop="dropSession(event,'${d}')"></div>`;
+    bodyHtml += `<div class="cal-day-col" id="col-${d}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="dropSession(event,'${d}')"></div>`;
   });
   bodyHtml += `</div></div>`;
 
@@ -770,17 +841,30 @@ function renderCalendarSessions() {
     const daySessions = calendarSessions.filter(s => s.day === d);
     daySessions.forEach(s => {
       const topFrac = timeToFrac(s.start);
-      const endFrac = timeToFrac(s.end);
-      const heightFrac = endFrac - topFrac;
+      const dur = s.duration || (timeToMins(s.end) - timeToMins(s.start));
+      const heightPx = Math.max((dur / 60) * PX_PER_HOUR, 28);
       const block = document.createElement('div');
-      block.className = `session-block ${s.location} ${s.confirmed ? 'confirmed' : ''}`;
+      block.className = `session-block ${s.location} ${s.confirmed ? 'confirmed' : ''} ${s.status === 'sent' ? 'sent' : ''}`;
       block.style.top = (topFrac * TOTAL_HOURS * PX_PER_HOUR) + 'px';
-      block.style.height = Math.max(heightFrac * TOTAL_HOURS * PX_PER_HOUR, 28) + 'px';
-      block.innerHTML = `<div class="session-name">${s.name}</div><div class="session-time">${s.start}–${s.end}</div><div class="session-loc-badge">${s.location === 'pool' ? 'Pool' : 'Home'}</div>`;
+      block.style.height = heightPx + 'px';
+      block.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="session-name">${s.name}</div>
+          <button onclick="removeSession(${s.id})" style="background:none;border:none;color:inherit;opacity:0.6;cursor:pointer;font-size:12px;padding:0;line-height:1;margin-left:4px" title="Remove">✕</button>
+        </div>
+        <div class="session-time">${s.start}–${s.end}</div>
+        <div class="session-loc-badge">${s.location === 'pool' ? 'Pool' : 'Home'} · ${dur}min</div>`;
       block.draggable = true;
       block.dataset.id = s.id;
-      block.addEventListener('dragstart', e => { e.dataTransfer.setData('sessionId', s.id); block.classList.add('dragging'); });
-      block.addEventListener('dragend', () => block.classList.remove('dragging'));
+      block.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('sessionId', s.id);
+        block.classList.add('dragging');
+        highlightAvailableCols(s);
+      });
+      block.addEventListener('dragend', () => {
+        block.classList.remove('dragging');
+        clearDragHighlights();
+      });
       block.addEventListener('dblclick', () => sendProposal(s.studentId));
       col.appendChild(block);
     });
@@ -813,6 +897,84 @@ function dropSession(event, day) {
 function pad(n) { return n < 10 ? '0' + n : '' + n; }
 function timeToMins(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
 
+// ══════════════ DRAG HIGHLIGHT ══════════════
+function highlightAvailableCols(session) {
+  const sub = submissions.find(s => s.id === session.studentId);
+  if (!sub) return;
+  const availDays = new Set(Object.keys(sub.availability));
+  DAYS.forEach(d => {
+    const col = document.getElementById('col-' + d);
+    if (!col) return;
+    if (availDays.has(d)) {
+      col.classList.add('drag-available');
+    } else {
+      col.classList.add('drag-unavailable');
+    }
+  });
+}
+
+function clearDragHighlights() {
+  DAYS.forEach(d => {
+    const col = document.getElementById('col-' + d);
+    if (col) {
+      col.classList.remove('drag-available', 'drag-unavailable', 'drag-over');
+    }
+  });
+}
+
+// ══════════════ REMOVE SLOT ══════════════
+function removeSession(id) {
+  calendarSessions = calendarSessions.filter(s => s.id !== id);
+  renderCalendarSessions();
+  showToast('Session removed');
+}
+
+// ══════════════ ADD SLOT MODAL ══════════════
+let nextSessionId = 1000;
+
+function openAddSlotModal() {
+  const datalist = document.getElementById('studentList');
+  datalist.innerHTML = submissions.map(s => `<option value="${s.name}">`).join('');
+  document.getElementById('addSlotModal').classList.add('open');
+}
+
+function closeAddSlotModal() {
+  document.getElementById('addSlotModal').classList.remove('open');
+}
+
+function confirmAddSlot() {
+  const name = document.getElementById('slot-student').value.trim();
+  const day = document.getElementById('slot-day').value;
+  const loc = document.getElementById('slot-loc').value;
+  const startVal = document.getElementById('slot-start').value;
+  const dur = parseInt(document.getElementById('slot-dur').value);
+
+  if (!name) { showToast('Please enter a student name'); return; }
+  if (!startVal) { showToast('Please set a start time'); return; }
+
+  const [sh, sm] = startVal.split(':').map(Number);
+  const endMins = sh * 60 + sm + dur;
+  const end = pad(Math.floor(endMins / 60)) + ':' + pad(endMins % 60);
+  const sub = submissions.find(s => s.name === name);
+
+  calendarSessions.push({
+    id: nextSessionId++,
+    studentId: sub ? sub.id : null,
+    name,
+    day,
+    start: startVal,
+    end,
+    duration: dur,
+    location: loc,
+    confirmed: false,
+    rank: 1
+  });
+
+  renderCalendarSessions();
+  closeAddSlotModal();
+  showToast(`Added ${name} on ${day} at ${startVal}`, 'success');
+}
+
 // ══════════════ AI SCHEDULING ══════════════
 async function runAI() {
   if (submissions.length === 0) { showToast('No submissions to schedule yet.'); return; }
@@ -826,10 +988,10 @@ async function runAI() {
   dot.className = 'ai-dot running';
   statusText.textContent = 'Proposing schedule...';
 
-  const workStart = document.getElementById('cfg-start').value || '09:00';
-  const workEnd = document.getElementById('cfg-end').value || '20:00';
-  const sessionDur = document.getElementById('cfg-dur').value || 60;
-  const travelBuf = document.getElementById('cfg-buf').value || 30;
+  const workStart = '09:00';
+  const workEnd = '20:00';
+  const sessionDur = 60;
+  const travelBuf = 30;
 
   // Build student data for the prompt
   const studentData = submissions.map((s, i) => {
@@ -841,7 +1003,7 @@ async function runAI() {
       return `${FULL_DAYS[DAYS.indexOf(day)] || day}: ${winStrs.join(', ')}`;
     }).join('; ');
 
-    return `Student ID: stu_${String(i+1).padStart(3,'0')}, Name: ${s.name}, Sessions/week: ${s.sessions_per_week}, Location: ${s.location === 'pool' ? 'pool' : 'home visit'}, Availability: ${availStr}${s.notes ? `, Notes: ${s.notes}` : ''}`;
+    return `Student ID: stu_${String(i+1).padStart(3,'0')}, Name: ${s.name}, Sessions/week: ${s.sessions_per_week}, Session duration: ${s.session_duration || 60}min, Location: ${s.location === 'pool' ? 'pool' : 'home visit'}, Availability: ${availStr}${s.notes ? `, Notes: ${s.notes}` : ''}`;
   }).join('\n');
 
   const inputPayload = `
@@ -857,7 +1019,7 @@ No existing calendar blocks this week.
   `.trim();
 
   try {
-    const resp = await fetch('/api/claude', {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -980,34 +1142,30 @@ function sendProposalByName(name, rank) {
 
 function openSendModal(sub, sessions) {
   sendTarget = { sub, sessions };
-  document.getElementById('modalTitle').textContent = `Send proposal to ${sub.name}`;
-  document.getElementById('modalDesc').textContent = `This will send an email to ${sub.email} with the proposed session times.`;
+  document.getElementById('modalTitle').textContent = `Send SMS to ${sub.name}`;
+  document.getElementById('modalDesc').textContent = `Sending to ${sub.phone}`;
 
   const sessionLines = sessions.length > 0
-    ? sessions.map(s => `  • ${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool, Docklands' : 'Home Visit'})`).join('\n')
-    : '  • Sessions to be confirmed';
+    ? sessions.map(s => `${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool' : 'Home Visit'})`).join(', ')
+    : 'TBC';
 
   document.getElementById('emailPreview').textContent =
-`Hi ${sub.name.split(' ')[0]},
+`Hi ${sub.name.split(' ')[0]}, it's Amir 🏊
 
-I've reviewed your availability and I'd like to propose the following session times for this week:
-
+Your proposed session${sessions.length > 1 ? 's' : ''} this week:
 ${sessionLines}
 
-Please reply to confirm these times work for you, or let me know if you'd like to adjust anything.
-
-Looking forward to our sessions!
-Amir`;
+Reply YES to confirm, or reply with your preferred time and I'll do my best to adjust.`;
 
   document.getElementById('sendModal').classList.add('open');
 }
 
 function openSendAllModal() {
   if (calendarSessions.length === 0) { showToast('No sessions to send'); return; }
-  const names = [...new Set(calendarSessions.map(s => s.name))];
-  document.getElementById('modalTitle').textContent = 'Send All Proposals';
-  document.getElementById('modalDesc').textContent = `This will send proposal emails to ${names.length} students: ${names.join(', ')}.`;
-  document.getElementById('emailPreview').textContent = `${names.length} emails will be sent with individual proposed session times.`;
+  const students = [...new Set(calendarSessions.map(s => s.name))];
+  document.getElementById('modalTitle').textContent = 'Send All SMS Proposals';
+  document.getElementById('modalDesc').textContent = `Sending SMS to ${students.length} students: ${students.join(', ')}`;
+  document.getElementById('emailPreview').textContent = `${students.length} SMS messages will be sent with individual proposed session times. Students reply YES to confirm or with a preferred time to request a change.`;
   sendTarget = { all: true };
   document.getElementById('sendModal').classList.add('open');
 }
@@ -1022,24 +1180,86 @@ async function confirmSend() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Sending...';
 
-  // In production: call your email API here (e.g. Resend/SendGrid)
-  await new Promise(r => setTimeout(r, 1200));
+  try {
+    if (sendTarget?.sub) {
+      const { sub, sessions } = sendTarget;
+      const sessionLines = sessions.map(s =>
+        `${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool' : 'Home Visit'})`
+      ).join(', ');
+      const message = `Hi ${sub.name.split(' ')[0]}, it's Amir 🏊\n\nYour proposed session${sessions.length > 1 ? 's' : ''} this week:\n${sessionLines}\n\nReply YES to confirm, or reply with your preferred time and I'll do my best to adjust.`;
 
-  if (sendTarget?.sub) {
-    const sub = sendTarget.sub;
-    const sessions = sendTarget.sessions;
-    sessions.forEach(s => { s.confirmed = true; });
-    renderCalendarSessions();
-    showToast(`✓ Proposal sent to ${sub.name}`, 'success');
-  } else if (sendTarget?.all) {
-    calendarSessions.forEach(s => { s.confirmed = true; });
-    renderCalendarSessions();
-    showToast('✓ All proposals sent!', 'success');
+      await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: sub.phone, message, studentName: sub.name, sessions })
+      });
+
+      sessions.forEach(s => { s.status = 'sent'; });
+      renderCalendarSessions();
+      showToast(`✓ SMS sent to ${sub.name}`, 'success');
+
+    } else if (sendTarget?.all) {
+      const byStudent = {};
+      calendarSessions.forEach(s => {
+        if (!byStudent[s.name]) byStudent[s.name] = [];
+        byStudent[s.name].push(s);
+      });
+      for (const [name, sessions] of Object.entries(byStudent)) {
+        const sub = submissions.find(x => x.name === name);
+        if (!sub) continue;
+        const sessionLines = sessions.map(s =>
+          `${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool' : 'Home Visit'})`
+        ).join(', ');
+        const message = `Hi ${name.split(' ')[0]}, it's Amir 🏊\n\nYour proposed session${sessions.length > 1 ? 's' : ''} this week:\n${sessionLines}\n\nReply YES to confirm, or reply with your preferred time and I'll do my best to adjust.`;
+        await fetch('/api/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: sub.phone, message, studentName: name, sessions })
+        });
+        sessions.forEach(s => { s.status = 'sent'; });
+      }
+      renderCalendarSessions();
+      showToast('✓ All SMS proposals sent!', 'success');
+    }
+  } catch(err) {
+    showToast('Error sending SMS: ' + err.message);
   }
 
   btn.disabled = false;
-  btn.innerHTML = 'Send Email';
+  btn.innerHTML = '📱 Send SMS';
   closeModal();
+}
+
+// ══════════════ PENDING REVIEWS (SMS replies) ══════════════
+let pendingReplies = [];
+
+function addPendingReply(studentName, requestedTime) {
+  pendingReplies.push({ studentName, requestedTime, at: new Date().toLocaleTimeString() });
+  renderPendingReplies();
+}
+
+function renderPendingReplies() {
+  const section = document.getElementById('pendingSection');
+  const list = document.getElementById('pendingList');
+  if (pendingReplies.length === 0) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  list.innerHTML = pendingReplies.map((r, i) => `
+    <div class="proposal-card" style="border-left:3px solid var(--warning)">
+      <div class="prop-info">
+        <div class="prop-name">${r.studentName}</div>
+        <div class="prop-slots">Requested: "${r.requestedTime}"</div>
+        <div class="prop-reason">Received at ${r.at}</div>
+      </div>
+      <div class="prop-actions">
+        <button class="btn btn-sm" onclick="dismissPending(${i})">Dismiss</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function dismissPending(i) {
+  pendingReplies.splice(i, 1);
+  renderPendingReplies();
 }
 
 // ══════════════ SCHEDULING PROMPT ══════════════
