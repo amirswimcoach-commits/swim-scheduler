@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amir's Swim Scheduler</title>
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #2a3547;
+    --border-bright: #3d4f6b;
+    --accent: #3b82f6;
+    --accent2: #60a5fa;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --pool: #1e40af;
+    --home: #7c3aed;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; }
+
+  /* ── SHARED LAYOUT ── */
+  .page { display: none; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* ── NAV ── */
+  .nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
+  .nav-brand .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab { padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all 0.15s; }
+  .nav-tab:hover { background: var(--surface2); color: var(--text); }
+  .nav-tab.active { background: var(--accent); color: white; }
+
+  /* ── FORM PAGE ── */
+  .form-wrap { max-width: 520px; margin: 0 auto; padding: 40px 20px 60px; }
+  .form-hero { text-align: center; margin-bottom: 40px; }
+  .form-hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .form-hero p { color: var(--muted); font-size: 15px; line-height: 1.6; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; }
+  .card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-size: 15px; padding: 10px 14px; outline: none; transition: border 0.15s; font-family: inherit;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* day/session toggles */
+  .day-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .toggle-btn { padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 14px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+  .toggle-btn.selected { border-color: var(--accent); background: rgba(59,130,246,0.15); color: var(--accent2); font-weight: 600; }
+  .session-count { display: flex; gap: 8px; }
+  .session-btn { width: 44px; height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+  .session-btn.selected { border-color: var(--accent); background: rgba(59,130,246,0.15); color: var(--accent2); }
+
+  /* time windows per day */
+  .day-windows { margin-top: 20px; }
+  .day-window-row { margin-bottom: 20px; }
+  .day-window-row .day-label { font-size: 14px; font-weight: 700; color: var(--accent2); margin-bottom: 10px; }
+  .window-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .window-btn {
+    padding: 16px 10px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted); cursor: pointer; text-align: center;
+    transition: all 0.15s; font-family: inherit; display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+  }
+  .window-btn:hover { border-color: var(--border-bright); }
+  .window-btn strong { display: block; font-size: 15px; font-weight: 600; color: var(--text); }
+  .window-btn small { font-size: 12px; color: var(--muted); }
+  .window-btn.selected { border-color: var(--accent); background: rgba(59,130,246,0.2); }
+  .window-btn.selected strong { color: var(--accent2); }
+  .window-btn.selected small { color: var(--accent2); opacity: 0.8; }
+
+  /* location cards */
+  .loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .loc-card { padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; background: var(--surface2); }
+  .loc-card.selected { border-color: var(--accent); background: rgba(59,130,246,0.1); }
+  .loc-card .loc-icon { font-size: 20px; margin-bottom: 6px; }
+  .loc-card .loc-name { font-size: 14px; font-weight: 600; }
+  .loc-card .loc-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* submit button */
+  .btn-primary { width: 100%; padding: 14px; border-radius: var(--radius); border: none; background: var(--accent); color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .form-note { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* success state */
+  .success-screen { text-align: center; padding: 60px 20px; }
+  .success-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(34,197,94,0.15); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 28px; }
+  .success-screen h2 { font-size: 22px; margin-bottom: 8px; }
+  .success-screen p { color: var(--muted); font-size: 15px; }
+
+  /* ── LOGIN PAGE ── */
+  .login-wrap { max-width: 360px; margin: 80px auto; padding: 0 20px; }
+  .login-wrap h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .login-wrap p { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .login-wrap .field input { padding: 12px 16px; font-size: 16px; }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 10px; display: none; }
+
+  /* ── DASHBOARD ── */
+  .dash-wrap { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .dash-header h2 { font-size: 20px; font-weight: 700; }
+  .dash-actions { display: flex; gap: 10px; }
+  .btn { padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+  .btn:hover { border-color: var(--border-bright); background: var(--surface); }
+  .btn-blue { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn-blue:hover { background: #2563eb; border-color: #2563eb; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-success { background: rgba(34,197,94,0.15); border-color: var(--success); color: var(--success); }
+
+  /* submissions panel */
+  .dash-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-header h3 { font-size: 14px; font-weight: 600; }
+  .panel-header .count-badge { background: var(--accent); color: white; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+  .submissions-list { max-height: 520px; overflow-y: auto; }
+  .submission-item { padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .submission-item:last-child { border-bottom: none; }
+  .submission-item:hover { background: var(--surface2); }
+  .submission-item.selected { background: rgba(59,130,246,0.1); border-left: 2px solid var(--accent); }
+  .sub-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .sub-meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+  .sub-tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+  .sub-tag.pool { border-color: #1e40af; color: #60a5fa; background: rgba(30,64,175,0.15); }
+  .sub-tag.home { border-color: #7c3aed; color: #a78bfa; background: rgba(124,58,237,0.15); }
+  .empty-state { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+
+  /* detail panel */
+  .detail-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .detail-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .label { color: var(--muted); }
+  .avail-grid { margin-top: 12px; }
+  .avail-day { margin-bottom: 10px; }
+  .avail-day-name { font-size: 12px; font-weight: 600; color: var(--accent2); margin-bottom: 4px; }
+  .avail-windows { display: flex; gap: 6px; flex-wrap: wrap; }
+  .avail-win-chip { padding: 3px 8px; border-radius: 4px; font-size: 11px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: var(--accent2); }
+
+  /* AI / calendar section */
+  .cal-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .cal-toolbar { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .cal-toolbar h3 { font-size: 14px; font-weight: 600; }
+  .ai-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .ai-dot.running { background: var(--warning); animation: pulse 1s infinite; }
+  .ai-dot.done { background: var(--success); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* calendar grid */
+  .cal-scroll { overflow-x: auto; }
+  .cal-grid { min-width: 700px; }
+  .cal-header-row { display: grid; grid-template-columns: 52px repeat(6, 1fr); border-bottom: 1px solid var(--border); }
+  .cal-day-head { padding: 10px 8px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .cal-body { position: relative; }
+  .cal-time-rows { }
+  .cal-time-row { display: grid; grid-template-columns: 52px repeat(6, 1fr); min-height: 48px; border-bottom: 1px solid rgba(42,53,71,0.4); }
+  .cal-time-label { padding: 4px 8px 0; font-size: 11px; color: var(--muted); text-align: right; line-height: 1; padding-top: 6px; }
+  .cal-cell { border-left: 1px solid rgba(42,53,71,0.4); position: relative; }
+
+  /* session blocks */
+  .cal-sessions-layer { position: absolute; top: 0; left: 52px; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr); pointer-events: none; }
+  .cal-day-col { position: relative; pointer-events: all; }
+  .session-block {
+    position: absolute; left: 3px; right: 3px;
+    border-radius: 6px; padding: 5px 7px; font-size: 11px; line-height: 1.3;
+    cursor: grab; user-select: none; transition: box-shadow 0.1s;
+    border: 1px solid transparent;
+  }
+  .session-block:active { cursor: grabbing; }
+  .session-block.pool { background: rgba(30,64,175,0.6); border-color: #3b82f6; color: #bfdbfe; }
+  .session-block.home { background: rgba(109,40,217,0.6); border-color: #8b5cf6; color: #ddd6fe; }
+  .session-block.confirmed { border-color: var(--success); }
+  .session-block.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.5); opacity: 0.85; z-index: 50; }
+  .session-name { font-weight: 700; font-size: 12px; }
+  .session-time { font-size: 10px; opacity: 0.8; }
+  .session-loc-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-top: 2px; display: inline-block; }
+  .pool .session-loc-badge { background: rgba(59,130,246,0.3); }
+  .home .session-loc-badge { background: rgba(139,92,246,0.3); }
+
+  /* proposal cards below calendar */
+  .proposals-wrap { padding: 18px; border-top: 1px solid var(--border); }
+  .proposals-wrap h4 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .proposal-list { display: flex; flex-direction: column; gap: 10px; }
+  .proposal-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .proposal-card.rank1 { border-left: 3px solid var(--success); }
+  .proposal-card.rank2 { border-left: 3px solid var(--warning); }
+  .prop-info .prop-name { font-size: 14px; font-weight: 600; }
+  .prop-info .prop-slots { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .prop-info .prop-reason { font-size: 11px; color: var(--muted); margin-top: 4px; font-style: italic; }
+  .prop-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* send modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--radius); padding: 28px; max-width: 480px; width: 90%; }
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .email-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; font-size: 13px; color: var(--text); margin-bottom: 20px; line-height: 1.7; white-space: pre-wrap; }
+
+  /* stats row */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stat-val { font-size: 24px; font-weight: 700; }
+  .stat-val.blue { color: var(--accent2); }
+  .stat-val.green { color: var(--success); }
+  .stat-val.amber { color: var(--warning); }
+
+  /* toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--radius-sm); padding: 12px 18px; font-size: 13px; color: var(--text); z-index: 300; transform: translateY(80px); opacity: 0; transition: all 0.25s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--success); }
+
+  /* working hours config */
+  .wh-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .wh-row label { font-size: 13px; color: var(--muted); min-width: 60px; }
+  .wh-row input[type=time] { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 6px 10px; font-size: 13px; font-family: inherit; }
+  .wh-row input[type=number] { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 6px 10px; font-size: 13px; width: 64px; font-family: inherit; }
+
+  /* loading spinner */
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
+  .text-muted { color: var(--muted); }
+  .text-sm { font-size: 13px; }
+  .mt-12 { margin-top: 12px; }
+
+  /* supabase config */
+  .config-note { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: var(--warning); margin-bottom: 20px; line-height: 1.5; }
+  .config-note strong { display: block; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav class="nav" id="mainNav" style="display:none">
+  <div class="nav-brand">
+    <div class="dot"></div>
+    Amir's Swim Scheduler
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('form')">Student Form</button>
+    <button class="nav-tab" onclick="showPage('dashboard')">Dashboard</button>
+  </div>
+</nav>
+
+<!-- ══════════════ FORM PAGE ══════════════ -->
+<div id="page-form" class="page active">
+  <div class="form-wrap">
+    <div class="form-hero">
+      <h1>Book with Amir 🏊</h1>
+      <p>Tell Amir when you're free and he'll propose the best session times for you.</p>
+    </div>
+
+    <div id="formContent">
+      <!-- Personal Details -->
+      <div class="card">
+        <div class="card-title">Your Details</div>
+        <div class="field">
+          <label>Full Name</label>
+          <input type="text" id="f-name" placeholder="e.g. Sarah Johnson" />
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label>Phone Number</label>
+            <input type="tel" id="f-phone" placeholder="04xx xxx xxx" />
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input type="email" id="f-email" placeholder="you@email.com" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Home Address</label>
+          <input type="text" id="f-address" placeholder="Street, Suburb, State" />
+        </div>
+      </div>
+
+      <!-- Sessions per week -->
+      <div class="card">
+        <div class="card-title">How many sessions this week?</div>
+        <div class="session-count" id="sessionCount">
+          <button class="session-btn" data-val="1" onclick="selectSession(this)">1</button>
+          <button class="session-btn" data-val="2" onclick="selectSession(this)">2</button>
+          <button class="session-btn selected" data-val="3" onclick="selectSession(this)">3</button>
+          <button class="session-btn" data-val="4" onclick="selectSession(this)">4</button>
+          <button class="session-btn" data-val="5" onclick="selectSession(this)">5</button>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div class="card">
+        <div class="card-title">Location Preference</div>
+        <div class="loc-grid">
+          <div class="loc-card selected" data-loc="pool" onclick="selectLocation(this)">
+            <div class="loc-icon">🏊</div>
+            <div class="loc-name">Our Recommended Pool</div>
+            <div class="loc-sub">Liv Aston, Docklands</div>
+          </div>
+          <div class="loc-card" data-loc="home" onclick="selectLocation(this)">
+            <div class="loc-icon">🏠</div>
+            <div class="loc-name">Home Visit</div>
+            <div class="loc-sub">Amir comes to you</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Availability -->
+      <div class="card">
+        <div class="card-title">Which days and windows are you available?</div>
+        <div class="day-grid" id="dayGrid">
+          <button class="toggle-btn" data-day="Mon" onclick="toggleDay(this)">Mon</button>
+          <button class="toggle-btn" data-day="Tue" onclick="toggleDay(this)">Tue</button>
+          <button class="toggle-btn" data-day="Wed" onclick="toggleDay(this)">Wed</button>
+          <button class="toggle-btn" data-day="Thu" onclick="toggleDay(this)">Thu</button>
+          <button class="toggle-btn" data-day="Fri" onclick="toggleDay(this)">Fri</button>
+          <button class="toggle-btn" data-day="Sat" onclick="toggleDay(this)">Sat</button>
+        </div>
+        <div class="day-windows" id="dayWindows"></div>
+      </div>
+
+      <!-- Timing notes -->
+      <div class="card">
+        <div class="card-title">Timing Preferences (Optional)</div>
+        <div class="field">
+          <textarea id="f-notes" placeholder="e.g. After 2:30pm preferred, can't do Thursday mornings…"></textarea>
+        </div>
+        <div class="text-sm text-muted mt-12">Amir's AI scheduler reads these notes to propose times that work best for you.</div>
+      </div>
+
+      <button class="btn-primary" id="submitBtn" onclick="submitForm()">Submit availability</button>
+      <div class="form-note">You can update this until Sunday 2:00 pm</div>
+    </div>
+
+    <!-- Success state -->
+    <div id="formSuccess" class="hidden">
+      <div class="success-screen">
+        <div class="success-icon">✓</div>
+        <h2>You're all set!</h2>
+        <p>Amir will review your availability and send you proposed session times shortly.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ LOGIN PAGE ══════════════ -->
+<div id="page-login" class="page">
+  <div class="login-wrap">
+    <h2>Coach Dashboard</h2>
+    <p>Enter your password to access scheduling tools.</p>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="btn-primary" onclick="doLogin()" style="margin-top:12px">Sign in</button>
+    <div class="login-error" id="loginError">Incorrect password. Try again.</div>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD PAGE ══════════════ -->
+<div id="page-dashboard" class="page">
+  <div class="dash-wrap">
+    <div class="dash-header">
+      <h2>Weekly Schedule</h2>
+      <div class="dash-actions">
+        <button class="btn" onclick="loadSubmissions()">↻ Refresh</button>
+        <button class="btn btn-blue" id="aiBtn" onclick="runAI()">
+          ✦ Propose with AI
+        </button>
+        <button class="btn btn-success hidden" id="sendAllBtn" onclick="openSendAllModal()">
+          ✉ Send All Proposals
+        </button>
+      </div>
+    </div>
+
+    <!-- Supabase config warning -->
+    <div class="config-note hidden" id="configNote">
+      <strong>⚠ Supabase not configured</strong>
+      Open this file and replace <code>https://itnuvlbvsavjoyvitebd.supabase.co</code> and <code>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bnV2bGJ2c2F2am95dml0ZWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTMwMjUsImV4cCI6MjA5MjYyOTAyNX0.t4SvFx3P4U6AOBFqU_g3P_BQa_bdHD5netxh-LxaIFo</code> with your project credentials. Running in demo mode with sample data.
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Submissions</div><div class="stat-val blue" id="stat-subs">0</div></div>
+      <div class="stat-card"><div class="stat-label">Sessions Proposed</div><div class="stat-val" id="stat-sessions">–</div></div>
+      <div class="stat-card"><div class="stat-label">Working Days</div><div class="stat-val amber" id="stat-days">–</div></div>
+      <div class="stat-card"><div class="stat-label">Days Off</div><div class="stat-val green" id="stat-off">–</div></div>
+    </div>
+
+    <!-- Working hours config -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title">Amir's Settings</div>
+      <div class="wh-row">
+        <label>Work hours</label>
+        <input type="time" id="cfg-start" value="09:00" />
+        <span class="text-muted text-sm">to</span>
+        <input type="time" id="cfg-end" value="20:00" />
+        <span style="margin-left:16px"></span>
+        <label>Session</label>
+        <input type="number" id="cfg-dur" value="60" min="30" max="120" step="15" />
+        <span class="text-muted text-sm">min</span>
+        <label style="margin-left:16px">Travel buffer</label>
+        <input type="number" id="cfg-buf" value="30" min="10" max="60" step="5" />
+        <span class="text-muted text-sm">min</span>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <!-- Left: submissions -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Student Submissions</h3>
+            <span class="count-badge" id="subCount">0</span>
+          </div>
+          <div class="submissions-list" id="submissionsList">
+            <div class="empty-state">No submissions yet.<br>Share the form link with students.</div>
+          </div>
+        </div>
+
+        <!-- Detail panel -->
+        <div class="detail-panel mt-12 hidden" id="detailPanel">
+          <h3 id="detailName"></h3>
+          <div id="detailContent"></div>
+        </div>
+      </div>
+
+      <!-- Right: calendar + proposals -->
+      <div>
+        <div class="cal-panel">
+          <div class="cal-toolbar">
+            <h3>Proposed Schedule</h3>
+            <div class="ai-status">
+              <div class="ai-dot" id="aiDot"></div>
+              <span id="aiStatusText">Ready</span>
+            </div>
+          </div>
+          <div class="cal-scroll">
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+          <div class="proposals-wrap hidden" id="proposalsSection">
+            <h4>Per-Student Proposals</h4>
+            <div class="proposal-list" id="proposalList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ SEND MODAL ══════════════ -->
+<div class="modal-overlay" id="sendModal">
+  <div class="modal">
+    <h3 id="modalTitle">Send Proposal</h3>
+    <p id="modalDesc"></p>
+    <div class="email-preview" id="emailPreview"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-blue" onclick="confirmSend()" id="confirmSendBtn">Send Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TOAST ══════════════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════ CONFIG — edit these ══════════════
+const SUPABASE_URL = 'https://itnuvlbvsavjoyvitebd.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_secret_k6oKQt-TT_Nzo3WEYeqWkg_bRsK8hx8';
+const DASHBOARD_PASSWORD = 'amir2024';
+
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+const FULL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const WINDOWS = [
+  { id: 'morning',   label: 'Morning',   hours: '9am – 1pm',  start: '09:00', end: '13:00' },
+  { id: 'afternoon', label: 'Afternoon', hours: '1pm – 5pm',  start: '13:00', end: '17:00' },
+  { id: 'evening',   label: 'Evening',   hours: '5pm – 9pm',  start: '17:00', end: '21:00' },
+];
+
+let sbClient = null;
+let submissions = [];
+let proposedSchedule = null;
+let selectedSubmission = null;
+let calendarSessions = [];
+
+function initSupabase() {
+  if (SUPABASE_URL !== 'https://itnuvlbvsavjoyvitebd.supabase.co' && window.supabase) {
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+}
+
+// ══════════════ PAGE ROUTING ══════════════
+let loggedIn = false;
+let currentPage = 'form';
+let sendTarget = null;
+
+function showPage(p) {
+  if (p === 'dashboard' && !loggedIn) {
+    setActivePage('login');
+    return;
+  }
+  setActivePage(p);
+  if (p === 'dashboard') loadSubmissions();
+}
+
+function setActivePage(p) {
+  currentPage = p;
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  const pg = document.getElementById('page-' + p);
+  if (pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach((t, i) => {
+    const pages = ['form','dashboard'];
+    t.classList.toggle('active', pages[i] === p);
+  });
+  document.getElementById('mainNav').style.display = 'flex';
+}
+
+function doLogin() {
+  const pw = document.getElementById('loginPass').value;
+  if (pw === DASHBOARD_PASSWORD) {
+    loggedIn = true;
+    document.getElementById('loginError').style.display = 'none';
+    setActivePage('dashboard');
+    loadSubmissions();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+// ══════════════ FORM LOGIC ══════════════
+let selectedDays = new Set();
+let selectedWindows = {}; // { 'Tue': Set(['morning','afternoon']) }
+let selectedSessions = 3;
+let selectedLoc = 'pool';
+
+function selectSession(btn) {
+  document.querySelectorAll('.session-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedSessions = parseInt(btn.dataset.val);
+}
+
+function selectLocation(card) {
+  document.querySelectorAll('.loc-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  selectedLoc = card.dataset.loc;
+}
+
+function toggleDay(btn) {
+  const d = btn.dataset.day;
+  if (selectedDays.has(d)) {
+    selectedDays.delete(d);
+    btn.classList.remove('selected');
+    delete selectedWindows[d];
+  } else {
+    selectedDays.add(d);
+    btn.classList.add('selected');
+    selectedWindows[d] = new Set();
+  }
+  renderDayWindows();
+}
+
+function toggleWindow(day, win, btn) {
+  if (!selectedWindows[day]) selectedWindows[day] = new Set();
+  if (selectedWindows[day].has(win)) {
+    selectedWindows[day].delete(win);
+    btn.classList.remove('selected');
+  } else {
+    selectedWindows[day].add(win);
+    btn.classList.add('selected');
+  }
+}
+
+function renderDayWindows() {
+  const cont = document.getElementById('dayWindows');
+  const days = [...selectedDays];
+  if (days.length === 0) { cont.innerHTML = ''; return; }
+  cont.innerHTML = days.map(d => `
+    <div class="day-window-row">
+      <div class="day-label">${FULL_DAYS[DAYS.indexOf(d)]}:</div>
+      <div class="window-btns">
+        ${WINDOWS.map(w => `
+          <button class="window-btn ${selectedWindows[d] && selectedWindows[d].has(w.id) ? 'selected' : ''}"
+            onclick="toggleWindow('${d}','${w.id}',this)">
+            <strong>${w.label}</strong>
+            <small>${w.hours}</small>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `).join('') + `<div style="font-size:12px;color:var(--muted);margin-top:4px">Tap any window to select it. You can select multiple per day.</div>`;
+}
+
+async function submitForm() {
+  const name = document.getElementById('f-name').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const address = document.getElementById('f-address').value.trim();
+  const notes = document.getElementById('f-notes').value.trim();
+
+  if (!name || !phone || !email) { showToast('Please fill in name, phone and email.'); return; }
+  if (selectedDays.size === 0) { showToast('Please select at least one available day.'); return; }
+
+  const availability = {};
+  for (const d of selectedDays) {
+    availability[d] = [...(selectedWindows[d] || [])];
+  }
+
+  const payload = {
+    name, phone, email, address, notes,
+    sessions_per_week: selectedSessions,
+    location: selectedLoc,
+    availability,
+    submitted_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting...';
+
+  if (sbClient) {
+    const { error } = await sbClient.from('availability_submissions').insert([payload]);
+    if (error) { showToast('Error: ' + error.message); btn.disabled = false; btn.innerHTML = 'Submit availability'; return; }
+  } else {
+    await new Promise(r => setTimeout(r, 800));
+  }
+
+  document.getElementById('formContent').classList.add('hidden');
+  document.getElementById('formSuccess').classList.remove('hidden');
+}
+
+// ══════════════ DASHBOARD: LOAD SUBMISSIONS ══════════════
+async function loadSubmissions() {
+  if (!sbClient) {
+    document.getElementById('configNote').classList.remove('hidden');
+    submissions = DEMO_SUBMISSIONS;
+  } else {
+    document.getElementById('configNote').classList.add('hidden');
+    const { data, error } = await sbClient.from('availability_submissions').select('*').order('submitted_at', { ascending: false });
+    if (error) { showToast('Error loading: ' + error.message); return; }
+    submissions = data || [];
+  }
+  renderSubmissions();
+  buildCalendarGrid();
+  updateStats();
+}
+
+const DEMO_SUBMISSIONS = [
+  { id: 1, name: 'Priya Patel', phone: '0412 345 678', email: 'priya@email.com', address: '12 Beach Rd, St Kilda', sessions_per_week: 2, location: 'pool', availability: { Tue: ['morning','afternoon'], Fri: ['morning','afternoon'], Wed: ['morning'] }, notes: 'After 2:30pm preferred on Tuesdays', submitted_at: new Date().toISOString() },
+  { id: 2, name: 'Tom Hughes', phone: '0423 456 789', email: 'tom@email.com', address: '45 Lygon St, Carlton', sessions_per_week: 3, location: 'pool', availability: { Mon: ['afternoon','evening'], Thu: ['morning'], Sat: ['morning','afternoon'] }, notes: 'Prefer mornings on Saturday', submitted_at: new Date().toISOString() },
+  { id: 3, name: 'Emma Clark', phone: '0434 567 890', email: 'emma@email.com', address: '8 Domain Rd, South Yarra', sessions_per_week: 1, location: 'home', availability: { Wed: ['morning','afternoon'], Sat: ['morning'] }, notes: 'Home visit only please', submitted_at: new Date().toISOString() },
+  { id: 4, name: 'Liam Barrett', phone: '0445 678 901', email: 'liam@email.com', address: '22 Grattan St, Fitzroy', sessions_per_week: 2, location: 'pool', availability: { Tue: ['afternoon','evening'], Wed: ['afternoon'], Fri: ['afternoon','evening'] }, notes: '', submitted_at: new Date().toISOString() },
+  { id: 5, name: 'Sarah Wong', phone: '0456 789 012', email: 'sarah@email.com', address: '3 Queens Rd, Melbourne', sessions_per_week: 2, location: 'pool', availability: { Mon: ['morning'], Thu: ['morning','afternoon'], Fri: ['morning','afternoon'] }, notes: 'Must finish by 6pm', submitted_at: new Date().toISOString() },
+];
+
+function renderSubmissions() {
+  const list = document.getElementById('submissionsList');
+  document.getElementById('subCount').textContent = submissions.length;
+  if (submissions.length === 0) {
+    list.innerHTML = '<div class="empty-state">No submissions yet.</div>';
+    return;
+  }
+  list.innerHTML = submissions.map(s => `
+    <div class="submission-item ${selectedSubmission === s.id ? 'selected' : ''}" onclick="selectSubmission(${s.id})">
+      <div class="sub-name">${s.name}</div>
+      <div class="sub-meta">
+        <span>${s.sessions_per_week}x / week</span>
+        <span class="sub-tag ${s.location}">${s.location === 'pool' ? '🏊 Pool' : '🏠 Home'}</span>
+        <span>${Object.keys(s.availability).join(', ')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectSubmission(id) {
+  selectedSubmission = id;
+  renderSubmissions();
+  const s = submissions.find(x => x.id === id);
+  if (!s) return;
+  const panel = document.getElementById('detailPanel');
+  panel.classList.remove('hidden');
+  document.getElementById('detailName').textContent = s.name;
+  const availHtml = Object.entries(s.availability).map(([day, wins]) => `
+    <div class="avail-day">
+      <div class="avail-day-name">${FULL_DAYS[DAYS.indexOf(day)] || day}</div>
+      <div class="avail-windows">
+        ${(wins || []).map(w => { const win = WINDOWS.find(x=>x.id===w); return win ? `<span class="avail-win-chip">${win.label} ${win.hours}</span>` : ''; }).join('')}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-row"><span class="label">Phone</span><span>${s.phone}</span></div>
+    <div class="detail-row"><span class="label">Email</span><span>${s.email}</span></div>
+    <div class="detail-row"><span class="label">Address</span><span>${s.address || '–'}</span></div>
+    <div class="detail-row"><span class="label">Sessions/week</span><span>${s.sessions_per_week}</span></div>
+    <div class="detail-row"><span class="label">Location</span><span>${s.location === 'pool' ? '🏊 Pool' : '🏠 Home'}</span></div>
+    ${s.notes ? `<div class="detail-row"><span class="label">Notes</span><span style="max-width:180px;text-align:right">${s.notes}</span></div>` : ''}
+    <div style="margin-top:12px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Availability</div>
+    ${availHtml}
+    <button class="btn btn-blue btn-sm" style="margin-top:14px;width:100%" onclick="sendProposal(${s.id})">✉ Send Proposal</button>
+  `;
+}
+
+// ══════════════ CALENDAR GRID ══════════════
+const CAL_START_HOUR = 8;
+const CAL_END_HOUR = 21;
+const TOTAL_HOURS = CAL_END_HOUR - CAL_START_HOUR;
+const PX_PER_HOUR = 60;
+
+function buildCalendarGrid() {
+  const grid = document.getElementById('calGrid');
+  const hours = [];
+  for (let h = CAL_START_HOUR; h <= CAL_END_HOUR; h++) hours.push(h);
+
+  let headerHtml = `<div class="cal-header-row"><div class="cal-day-head"></div>`;
+  DAYS.forEach(d => { headerHtml += `<div class="cal-day-head">${d}</div>`; });
+  headerHtml += '</div>';
+
+  let bodyHtml = `<div class="cal-body"><div class="cal-time-rows">`;
+  hours.forEach(h => {
+    bodyHtml += `<div class="cal-time-row"><div class="cal-time-label">${h < 10 ? '0'+h : h}:00</div>`;
+    DAYS.forEach(() => { bodyHtml += `<div class="cal-cell"></div>`; });
+    bodyHtml += `</div>`;
+  });
+  bodyHtml += `</div>`;
+
+  // sessions layer
+  bodyHtml += `<div class="cal-sessions-layer" id="sessionsLayer">`;
+  DAYS.forEach((d, i) => {
+    bodyHtml += `<div class="cal-day-col" id="col-${d}" ondragover="event.preventDefault()" ondrop="dropSession(event,'${d}')"></div>`;
+  });
+  bodyHtml += `</div></div>`;
+
+  grid.innerHTML = headerHtml + bodyHtml;
+  renderCalendarSessions();
+}
+
+function timeToFrac(t) {
+  const [h, m] = t.split(':').map(Number);
+  return (h - CAL_START_HOUR + m / 60) / TOTAL_HOURS;
+}
+
+function renderCalendarSessions() {
+  DAYS.forEach(d => {
+    const col = document.getElementById('col-' + d);
+    if (!col) return;
+    col.innerHTML = '';
+    col.style.position = 'relative';
+    col.style.height = (TOTAL_HOURS * PX_PER_HOUR) + 'px';
+    const daySessions = calendarSessions.filter(s => s.day === d);
+    daySessions.forEach(s => {
+      const topFrac = timeToFrac(s.start);
+      const endFrac = timeToFrac(s.end);
+      const heightFrac = endFrac - topFrac;
+      const block = document.createElement('div');
+      block.className = `session-block ${s.location} ${s.confirmed ? 'confirmed' : ''}`;
+      block.style.top = (topFrac * TOTAL_HOURS * PX_PER_HOUR) + 'px';
+      block.style.height = Math.max(heightFrac * TOTAL_HOURS * PX_PER_HOUR, 28) + 'px';
+      block.innerHTML = `<div class="session-name">${s.name}</div><div class="session-time">${s.start}–${s.end}</div><div class="session-loc-badge">${s.location === 'pool' ? 'Pool' : 'Home'}</div>`;
+      block.draggable = true;
+      block.dataset.id = s.id;
+      block.addEventListener('dragstart', e => { e.dataTransfer.setData('sessionId', s.id); block.classList.add('dragging'); });
+      block.addEventListener('dragend', () => block.classList.remove('dragging'));
+      block.addEventListener('dblclick', () => sendProposal(s.studentId));
+      col.appendChild(block);
+    });
+  });
+}
+
+let dragOffsetY = 0;
+function dropSession(event, day) {
+  event.preventDefault();
+  const id = event.dataTransfer.getData('sessionId');
+  const session = calendarSessions.find(s => s.id == id);
+  if (!session) return;
+  const col = event.currentTarget;
+  const rect = col.getBoundingClientRect();
+  const yFrac = (event.clientY - rect.top) / (TOTAL_HOURS * PX_PER_HOUR);
+  const totalMins = yFrac * TOTAL_HOURS * 60;
+  const roundedMins = Math.round(totalMins / 15) * 15;
+  const absHour = CAL_START_HOUR * 60 + roundedMins;
+  const newH = Math.floor(absHour / 60);
+  const newM = absHour % 60;
+  const dur = timeToMins(session.end) - timeToMins(session.start);
+  session.start = pad(newH) + ':' + pad(newM);
+  const endMins = newH * 60 + newM + dur;
+  session.end = pad(Math.floor(endMins / 60)) + ':' + pad(endMins % 60);
+  session.day = day;
+  renderCalendarSessions();
+  showToast('Session moved to ' + day + ' ' + session.start);
+}
+
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+function timeToMins(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+
+// ══════════════ AI SCHEDULING ══════════════
+async function runAI() {
+  if (submissions.length === 0) { showToast('No submissions to schedule yet.'); return; }
+
+  const btn = document.getElementById('aiBtn');
+  const dot = document.getElementById('aiDot');
+  const statusText = document.getElementById('aiStatusText');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Running AI...';
+  dot.className = 'ai-dot running';
+  statusText.textContent = 'Proposing schedule...';
+
+  const workStart = document.getElementById('cfg-start').value || '09:00';
+  const workEnd = document.getElementById('cfg-end').value || '20:00';
+  const sessionDur = document.getElementById('cfg-dur').value || 60;
+  const travelBuf = document.getElementById('cfg-buf').value || 30;
+
+  // Build student data for the prompt
+  const studentData = submissions.map((s, i) => {
+    const availStr = Object.entries(s.availability).map(([day, wins]) => {
+      const winStrs = (wins || []).map(w => {
+        const win = WINDOWS.find(x => x.id === w);
+        return win ? `${win.label} (${win.start}–${win.end})` : w;
+      });
+      return `${FULL_DAYS[DAYS.indexOf(day)] || day}: ${winStrs.join(', ')}`;
+    }).join('; ');
+
+    return `Student ID: stu_${String(i+1).padStart(3,'0')}, Name: ${s.name}, Sessions/week: ${s.sessions_per_week}, Location: ${s.location === 'pool' ? 'pool' : 'home visit'}, Availability: ${availStr}${s.notes ? `, Notes: ${s.notes}` : ''}`;
+  }).join('\n');
+
+  const inputPayload = `
+Working hours: ${workStart}–${workEnd}
+Default session duration: ${sessionDur} minutes
+Travel buffer (pool↔home): ${travelBuf} minutes
+bufferMin: ${travelBuf}
+
+STUDENTS:
+${studentData}
+
+No existing calendar blocks this week.
+  `.trim();
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: getSchedulingPrompt(travelBuf),
+        messages: [{ role: 'user', content: inputPayload }]
+      })
+    });
+    const data = await resp.json();
+    const raw = data.content?.find(b => b.type === 'text')?.text || '';
+
+    let json;
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      json = JSON.parse(clean);
+    } catch(e) {
+      showToast('AI returned unexpected format. Check console.'); console.error(raw);
+      resetAIBtn(); return;
+    }
+
+    proposedSchedule = json;
+    applyProposedSchedule(json);
+    dot.className = 'ai-dot done';
+    statusText.textContent = 'Schedule proposed';
+    btn.disabled = false;
+    btn.innerHTML = '✦ Re-run AI';
+    document.getElementById('sendAllBtn').classList.remove('hidden');
+    updateStats(json);
+    showToast('✓ Schedule proposed! Drag to adjust, then send.', 'success');
+
+  } catch(err) {
+    showToast('Error calling AI: ' + err.message);
+    resetAIBtn();
+  }
+}
+
+function resetAIBtn() {
+  const btn = document.getElementById('aiBtn');
+  btn.disabled = false;
+  btn.innerHTML = '✦ Propose with AI';
+  document.getElementById('aiDot').className = 'ai-dot';
+  document.getElementById('aiStatusText').textContent = 'Ready';
+}
+
+function applyProposedSchedule(json) {
+  calendarSessions = [];
+  let sid = 1;
+
+  if (json.rank1_master_timeline) {
+    json.rank1_master_timeline.forEach(slot => {
+      const dayShort = slot.time.split(' ')[0].substring(0,3);
+      const times = slot.time.split(' ')[1];
+      const [start, end] = times.split('-');
+      const sub = submissions.find(s => s.name === slot.student_name) ||
+                  submissions.find(s => slot.student_id && slot.student_id.includes(submissions.indexOf(s)+1));
+      calendarSessions.push({
+        id: sid++,
+        studentId: sub ? sub.id : null,
+        name: slot.student_name || slot.student_id,
+        day: dayShort,
+        start, end,
+        location: slot.location,
+        confirmed: false,
+        rank: 1
+      });
+    });
+  }
+
+  renderCalendarSessions();
+
+  // Render per-student proposals
+  if (json.proposals) {
+    const section = document.getElementById('proposalsSection');
+    const list = document.getElementById('proposalList');
+    section.classList.remove('hidden');
+    list.innerHTML = json.proposals.map(p => {
+      const opts = p.option_sets || [];
+      return opts.map(opt => `
+        <div class="proposal-card rank${opt.rank}">
+          <div class="prop-info">
+            <div class="prop-name">${p.student_name} — Option ${opt.rank}: ${opt.label}</div>
+            <div class="prop-slots">${(opt.sessions||[]).map(s=>`${s.day} ${s.start_time}–${s.end_time} (${s.location})`).join(' · ')}</div>
+            <div class="prop-reason">${opt.reasoning||''}</div>
+          </div>
+          <div class="prop-actions">
+            <button class="btn btn-sm btn-success" onclick="sendProposalByName('${p.student_name}',${opt.rank})">✉ Send</button>
+          </div>
+        </div>
+      `).join('');
+    }).join('');
+  }
+}
+
+function updateStats(json) {
+  document.getElementById('stat-subs').textContent = submissions.length;
+  if (json) {
+    document.getElementById('stat-sessions').textContent = calendarSessions.length;
+    document.getElementById('stat-days').textContent = json.total_working_days || '–';
+    const totalDays = 7;
+    const working = json.total_working_days || 0;
+    document.getElementById('stat-off').textContent = totalDays - working;
+  }
+}
+
+// ══════════════ SEND PROPOSAL ══════════════
+function sendProposal(studentId) {
+  const sub = submissions.find(s => s.id === studentId);
+  if (!sub) return;
+  const sessions = calendarSessions.filter(s => s.studentId === studentId);
+  openSendModal(sub, sessions);
+}
+
+function sendProposalByName(name, rank) {
+  const sub = submissions.find(s => s.name === name);
+  if (!sub) { showToast('Student not found'); return; }
+  const sessions = calendarSessions.filter(s => s.name === name);
+  openSendModal(sub, sessions);
+}
+
+function openSendModal(sub, sessions) {
+  sendTarget = { sub, sessions };
+  document.getElementById('modalTitle').textContent = `Send proposal to ${sub.name}`;
+  document.getElementById('modalDesc').textContent = `This will send an email to ${sub.email} with the proposed session times.`;
+
+  const sessionLines = sessions.length > 0
+    ? sessions.map(s => `  • ${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool, Docklands' : 'Home Visit'})`).join('\n')
+    : '  • Sessions to be confirmed';
+
+  document.getElementById('emailPreview').textContent =
+`Hi ${sub.name.split(' ')[0]},
+
+I've reviewed your availability and I'd like to propose the following session times for this week:
+
+${sessionLines}
+
+Please reply to confirm these times work for you, or let me know if you'd like to adjust anything.
+
+Looking forward to our sessions!
+Amir`;
+
+  document.getElementById('sendModal').classList.add('open');
+}
+
+function openSendAllModal() {
+  if (calendarSessions.length === 0) { showToast('No sessions to send'); return; }
+  const names = [...new Set(calendarSessions.map(s => s.name))];
+  document.getElementById('modalTitle').textContent = 'Send All Proposals';
+  document.getElementById('modalDesc').textContent = `This will send proposal emails to ${names.length} students: ${names.join(', ')}.`;
+  document.getElementById('emailPreview').textContent = `${names.length} emails will be sent with individual proposed session times.`;
+  sendTarget = { all: true };
+  document.getElementById('sendModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('sendModal').classList.remove('open');
+  sendTarget = null;
+}
+
+async function confirmSend() {
+  const btn = document.getElementById('confirmSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Sending...';
+
+  // In production: call your email API here (e.g. Resend/SendGrid)
+  await new Promise(r => setTimeout(r, 1200));
+
+  if (sendTarget?.sub) {
+    const sub = sendTarget.sub;
+    const sessions = sendTarget.sessions;
+    sessions.forEach(s => { s.confirmed = true; });
+    renderCalendarSessions();
+    showToast(`✓ Proposal sent to ${sub.name}`, 'success');
+  } else if (sendTarget?.all) {
+    calendarSessions.forEach(s => { s.confirmed = true; });
+    renderCalendarSessions();
+    showToast('✓ All proposals sent!', 'success');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Send Email';
+  closeModal();
+}
+
+// ══════════════ SCHEDULING PROMPT ══════════════
+function getSchedulingPrompt(bufferMin) {
+  return `You think like a coach's operations manager. Student preferences are respected when possible but NEVER override Amir's efficiency.
+
+You ALWAYS return valid JSON — no prose before or after. No explanations outside the JSON.
+
+╔══════════════════════════════════════════════════════════╗
+║  TIME FORMAT RULE — ABSOLUTE, OVERRIDES ALL MATH        ║
+║  Every start_time and end_time MUST end in :00,:15,:30,:45 ║
+╚══════════════════════════════════════════════════════════╝
+
+AMIR'S 6 RULES:
+RULE 1 — ZERO-GAP BACK-TO-BACK AT POOL. Pool sessions: ZERO dead time between them.
+RULE 2 — FLEXIBLE STUDENTS BEND TO RIGID STUDENTS.
+RULE 3 — CONSOLIDATE TEACHING DAYS. Minimise working days.
+RULE 4 — NO TWO SESSIONS SAME DAY (hard, all option sets).
+RULE 5 — MINIMISE GAPS. Place each session as close as possible to adjacent sessions using backwards calculation.
+RULE 6 — AVAILABILITY WINDOWS = HARD. Preference notes = soft.
+
+HOME VISIT RULES: Never sandwich a home visit between two pool sessions. Home visits go at EDGES of the day. Travel buffer: pool↔home = ${bufferMin}min. Pool→Pool: ZERO buffer.
+
+TWO-PHASE PROCEDURE:
+PHASE 1: BUILD DAY MAP — decide which days are active first. Pack students onto fewest days. Never put a student on a day where they'd be the only one if a busier day is available.
+PHASE 2: PLACE SESSIONS — place rigid anchors first, then work backwards for all other sessions to minimise gaps.
+
+OUTPUT FORMAT (strict JSON, no prose outside JSON):
+{
+  "phase1_day_map": { "active_days": [], "days_off": [], "rigid_anchors": {}, "student_day_assignments": {}, "lonely_day_moves": [], "pairings": {} },
+  "rank1_master_timeline": [{"time": "Mon 09:15-10:00", "student_id": "...", "student_name": "...", "location": "pool", "gap_after_minutes": 0}],
+  "proposals": [{"student_id": "...", "student_name": "...", "sessions_requested": 1, "option_sets": [{"rank": 1, "label": "...", "sessions": [{"session_number": 1, "day": "Monday", "start_time": "09:15", "end_time": "10:00", "location": "pool"}], "reasoning": "..."}]}],
+  "day_summary": {},
+  "scheduling_notes": "...",
+  "conflict_check_passed": true,
+  "total_working_days": 0,
+  "total_dead_time_minutes": 0
+}`;
+}
+
+// ══════════════ TOAST ══════════════
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// ══════════════ INIT ══════════════
+function bootApp() {
+  initSupabase();
+  setActivePage('form');
+  buildCalendarGrid();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  s.onload = bootApp;
+  s.onerror = bootApp;
+  document.head.appendChild(s);
+});
+</script>
+</body>
+</html>
