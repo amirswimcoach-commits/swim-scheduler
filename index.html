@@ -1186,7 +1186,7 @@ async function confirmSend() {
       const sessionLines = sessions.map(s =>
         `${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool' : 'Home Visit'})`
       ).join(', ');
-      const message = `Hi ${sub.name.split(' ')[0]}, Amir here. Session: ${sessionLines}. Reply YES to confirm or text preferred time.`;
+      const message = `Amir: ${sub.name.split(' ')[0]}, session proposed. Reply YES or preferred time.`;
 
       await fetch('/api/send-sms', {
         method: 'POST',
@@ -1210,7 +1210,7 @@ async function confirmSend() {
         const sessionLines = sessions.map(s =>
           `${FULL_DAYS[DAYS.indexOf(s.day)] || s.day} ${s.start}–${s.end} (${s.location === 'pool' ? 'Liv Aston Pool' : 'Home Visit'})`
         ).join(', ');
-        const message = `Hi ${name.split(' ')[0]}, Amir here. Session: ${sessionLines}. Reply YES to confirm or text preferred time.`;
+        const message = `Amir: ${name.split(' ')[0]}, session proposed. Reply YES or preferred time.`;
         await fetch('/api/send-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
