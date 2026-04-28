@@ -568,7 +568,7 @@ let selectedSubmission = null;
 let calendarSessions = [];
 
 function initSupabase() {
-  if (SUPABASE_URL !== 'https://itnuvlbvsavjoyvitebd.supabase.co' && window.supabase) {
+  if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase) {
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 }
