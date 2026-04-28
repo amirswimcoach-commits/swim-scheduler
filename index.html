@@ -98,7 +98,7 @@
   .form-note { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
   /* success state */
-  .success-screen { text-align: center; padding: 60px 20px; }
+  .success-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; text-align: center; padding: 60px 20px; }
   .success-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(34,197,94,0.15); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 28px; }
   .success-screen h2 { font-size: 22px; margin-bottom: 8px; }
   .success-screen p { color: var(--muted); font-size: 15px; }
@@ -259,7 +259,13 @@
   .mt-12 { margin-top: 12px; }
   .hidden { display: none !important; }
 
-  /* supabase config */
+  /* week navigator */
+  .week-nav { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 14px; margin-bottom: 20px; }
+  .week-nav-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); width: 30px; height: 30px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .week-nav-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .week-nav-label { font-size: 14px; font-weight: 600; flex: 1; text-align: center; }
+  .week-nav-today { font-size: 12px; color: var(--accent2); cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: rgba(59,130,246,0.1); }
+  .week-nav-today:hover { background: rgba(59,130,246,0.2); }
   .config-note { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: var(--warning); margin-bottom: 20px; line-height: 1.5; }
   .config-note strong { display: block; margin-bottom: 4px; }
 </style>
@@ -378,8 +384,7 @@
       <div class="form-note">You can update this until Sunday 2:00 pm</div>
     </div>
 
-    <!-- Success state -->
-    <div id="formSuccess" class="hidden">
+    <div id="formSuccess" style="display:none">
       <div class="success-screen">
         <div class="success-icon">✓</div>
         <h2>You're all set!</h2>
@@ -424,6 +429,14 @@
     <div class="config-note hidden" id="configNote">
       <strong>⚠ Supabase not configured</strong>
       Open this file and replace <code>YOUR_SUPABASE_URL</code> and <code>YOUR_SUPABASE_ANON_KEY</code> with your project credentials. Running in demo mode with sample data.
+    </div>
+
+    <!-- Week Navigator -->
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="changeWeek(-1)">←</button>
+      <div class="week-nav-label" id="weekLabel">Loading...</div>
+      <button class="week-nav-btn" onclick="changeWeek(1)">→</button>
+      <button class="week-nav-today" onclick="goToCurrentWeek()">This week</button>
     </div>
 
     <!-- Stats -->
@@ -549,8 +562,8 @@
 
 <script>
 // ══════════════ CONFIG — edit these ══════════════
-const SUPABASE_URL = 'https://itnuvlbvsavjoyvitebd.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bnV2bGJ2c2F2am95dml0ZWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTMwMjUsImV4cCI6MjA5MjYyOTAyNX0.t4SvFx3P4U6AOBFqU_g3P_BQa_bdHD5netxh-LxaIFo';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 const DASHBOARD_PASSWORD = 'amir2024';
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -571,6 +584,61 @@ function initSupabase() {
   if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase) {
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
+}
+
+// ══════════════ WEEK NAVIGATION ══════════════
+let currentWeekStart = getWeekStart(new Date());
+
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getWeekEnd(weekStart) {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + 6);
+  return d;
+}
+
+function formatWeekLabel(weekStart) {
+  const end = getWeekEnd(weekStart);
+  const opts = { day: 'numeric', month: 'short' };
+  const startStr = weekStart.toLocaleDateString('en-AU', opts);
+  const endStr = end.toLocaleDateString('en-AU', { ...opts, year: 'numeric' });
+  return `${startStr} – ${endStr}`;
+}
+
+function formatDateISO(date) {
+  return date.toISOString().split('T')[0];
+}
+
+function changeWeek(dir) {
+  currentWeekStart = new Date(currentWeekStart);
+  currentWeekStart.setDate(currentWeekStart.getDate() + dir * 7);
+  updateWeekLabel();
+  calendarSessions = [];
+  loadSubmissions();
+}
+
+function goToCurrentWeek() {
+  currentWeekStart = getWeekStart(new Date());
+  updateWeekLabel();
+  calendarSessions = [];
+  loadSubmissions();
+}
+
+function updateWeekLabel() {
+  const label = document.getElementById('weekLabel');
+  if (label) label.textContent = formatWeekLabel(currentWeekStart);
+  // highlight if current week
+  const todayWeek = getWeekStart(new Date());
+  const isCurrentWeek = formatDateISO(currentWeekStart) === formatDateISO(todayWeek);
+  const todayBtn = document.querySelector('.week-nav-today');
+  if (todayBtn) todayBtn.style.opacity = isCurrentWeek ? '0.4' : '1';
 }
 
 // ══════════════ PAGE ROUTING ══════════════
@@ -702,6 +770,7 @@ async function submitForm() {
     session_duration: selectedDuration,
     location: selectedLoc,
     availability,
+    week_start: formatDateISO(getWeekStart(new Date())),
     submitted_at: new Date().toISOString()
   };
 
@@ -718,20 +787,29 @@ async function submitForm() {
 
   btn.disabled = false;
   btn.innerHTML = 'Submit availability';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   document.getElementById('formContent').classList.add('hidden');
-  const successEl = document.getElementById('formSuccess');
-  successEl.classList.remove('hidden');
-  successEl.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('formSuccess').style.display = 'block';
 }
 
 // ══════════════ DASHBOARD: LOAD SUBMISSIONS ══════════════
 async function loadSubmissions() {
+  updateWeekLabel();
+  const weekStartISO = formatDateISO(currentWeekStart);
+  const weekEnd = getWeekEnd(currentWeekStart);
+  const weekEndISO = formatDateISO(weekEnd);
+
   if (!sbClient) {
     document.getElementById('configNote').classList.remove('hidden');
     submissions = DEMO_SUBMISSIONS;
   } else {
     document.getElementById('configNote').classList.add('hidden');
-    const { data, error } = await sbClient.from('availability_submissions').select('*').order('submitted_at', { ascending: false });
+    const { data, error } = await sbClient
+      .from('availability_submissions')
+      .select('*')
+      .gte('week_start', weekStartISO)
+      .lte('week_start', weekEndISO)
+      .order('submitted_at', { ascending: false });
     if (error) { showToast('Error loading: ' + error.message); return; }
     submissions = data || [];
   }
@@ -1318,6 +1396,7 @@ function bootApp() {
   initSupabase();
   setActivePage('form');
   buildCalendarGrid();
+  updateWeekLabel();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
